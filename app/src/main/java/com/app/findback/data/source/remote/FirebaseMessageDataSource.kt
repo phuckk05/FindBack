@@ -375,7 +375,7 @@ class FirebaseMessageDataSource {
                 val request = Request.Builder()
                     .url("https://onesignal.com/api/v1/notifications")
                     .post(body)
-                    .addHeader("Authorization", "Key os_v2_app_xx2vc3onong5fmmjyqu7qmi32vzte2tkyw4ufwuf6jk3w6nf4fbtozf4zz53tnymvgwb4eh6qwlpkalmi42umkxuw4zzb4haq6yzr4i")  // ← Sửa ở đây
+                    .addHeader("Authorization", "Key os_v2_app_xx2vc3onong5fmmjyqu7qmi32uibwfrtofleignbzmxd4mhhltg7t6n6w4qisvt7g6vrstfdujwzmncg2dmnfx6pp6uyzv45iededey")
                     .addHeader("Content-Type", "application/json; charset=utf-8")
                     .build()
                 val response = client.newCall(request).execute()

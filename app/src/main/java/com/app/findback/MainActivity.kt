@@ -66,7 +66,7 @@ class MainActivity : BaseActivity() {
                     event.preventDefault()
                     return
                 }
-                
+
                 event.preventDefault()
 
                 val conversationId = data.optString("conversationId", "")
