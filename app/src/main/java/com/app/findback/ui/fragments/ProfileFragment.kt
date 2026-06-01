@@ -7,17 +7,17 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.fragment.app.FragmentActivity
+import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.app.findback.LoginActivity
 import com.app.findback.R
 import com.app.findback.databinding.FragmentProfileBinding
-import com.app.findback.domain.models.Post
-import com.app.findback.ui.adapters.MyPostAdapter
 import com.app.findback.ui.components.toolbar.ToolbarConfig
 import com.app.findback.ui.components.toolbar.ToolbarConfigProvider
 import com.bumptech.glide.Glide
+import com.google.android.material.tabs.TabLayoutMediator
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.*
+import com.google.firebase.database.FirebaseDatabase
 
 class ProfileFragment : Fragment(), ToolbarConfigProvider {
 
@@ -25,141 +25,98 @@ class ProfileFragment : Fragment(), ToolbarConfigProvider {
     private val binding get() = _binding!!
 
     private lateinit var auth: FirebaseAuth
-    private lateinit var adapter: MyPostAdapter
 
-    private val postList = mutableListOf<Post>()
-
-    // Firebase listener
-    private var postsListener: ValueEventListener? = null
-    private lateinit var postsRef: Query
+    // Giữ reference để gọi reload khi cần
+    private var myPostsFragment: MyPostsFragment? = null
+    private var savedPostsFragment: SavedPostsFragment? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-
-        _binding = FragmentProfileBinding.inflate(
-            inflater,
-            container,
-            false
-        )
-
+        _binding = FragmentProfileBinding.inflate(inflater, container, false)
         auth = FirebaseAuth.getInstance()
 
-        setupRecyclerView()
         loadUserInfo()
-        loadMyPosts()
+        setupViewPager()
         setupActions()
 
         return binding.root
     }
 
-    private fun setupRecyclerView() {
+    // ─── ViewPager2 + TabLayout ───────────────────────────────────────────────
 
-        adapter = MyPostAdapter(
-            list = postList,
-            isMyPost = true,
+    private fun setupViewPager() {
+        val pagerAdapter = ProfilePagerAdapter(requireActivity())
+        binding.viewPager.adapter = pagerAdapter
+        binding.viewPager.isUserInputEnabled = false // tắt swipe để không conflict NestedScrollView
 
-            onEdit = { post ->
+        TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
+            tab.text = if (position == 0) "Bài đăng" else "Đã lưu"
+        }.attach()
 
-                val bottomSheet =
-                    EditPostBottomSheet.newInstance(post)
-
-                bottomSheet.setOnDismissListener {
-                    // Firebase realtime tự cập nhật
-                }
-
-                bottomSheet.show(
-                    parentFragmentManager,
-                    "EditPost"
-                )
-            },
-
-            onDelete = { post ->
-
-                android.app.AlertDialog.Builder(requireContext())
-                    .setTitle("Xác nhận xóa")
-                    .setMessage("Bạn có chắc muốn xóa bài đăng này không?")
-                    .setCancelable(false)
-
-                    .setPositiveButton("Xóa") { _, _ ->
-
-                        FirebaseDatabase.getInstance()
-                            .getReference("posts")
-                            .child(post.postId)
-                            .removeValue()
-
-                            .addOnSuccessListener {
-
-                                if (_binding == null) return@addOnSuccessListener
-
-                                Toast.makeText(
-                                    requireContext(),
-                                    "Đã xóa bài đăng",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-
-                            .addOnFailureListener {
-
-                                if (_binding == null) return@addOnFailureListener
-
-                                Toast.makeText(
-                                    requireContext(),
-                                    "Xóa thất bại: ${it.message}",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                    }
-
-                    .setNegativeButton("Hủy") { dialog, _ ->
-                        dialog.dismiss()
-                    }
-
-                    .show()
+        // Lắng nghe page change để lazy-load đúng fragment
+        binding.viewPager.registerOnPageChangeCallback(object :
+            androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                // Có thể thêm logic reload nếu cần
             }
-        )
+        })
+    }
 
-        binding.rvMyPosts.apply {
+    /**
+     * FragmentStateAdapter tạo 2 fragment:
+     *   0 → MyPostsFragment   (Bài đăng của tôi)
+     *   1 → SavedPostsFragment (Đã lưu)
+     */
+    private inner class ProfilePagerAdapter(
+        fa: FragmentActivity
+    ) : FragmentStateAdapter(fa) {
 
-            layoutManager =
-                LinearLayoutManager(requireContext())
+        override fun getItemCount() = 2
 
-            adapter = this@ProfileFragment.adapter
+        override fun createFragment(position: Int): Fragment {
+            return when (position) {
+                0 -> MyPostsFragment().also { f ->
+                    myPostsFragment = f
+                    f.onPostCountLoaded = { count ->
+                        if (_binding != null) {
+                            binding.txtPostCount.text = count.toString()
+                        }
+                    }
+                }
+                else -> SavedPostsFragment().also { f ->
+                    savedPostsFragment = f
+                    f.onSavedCountLoaded = { count ->
+                        if (_binding != null) {
+                            binding.txtSavedCount.text = count.toString()
+                        }
+                    }
+                }
+            }
         }
     }
 
+    // ─── Load user info ───────────────────────────────────────────────────────
+
     private fun loadUserInfo() {
-
         val user = auth.currentUser ?: return
-
-        binding.txtEmail.text =
-            user.email ?: ""
+        binding.txtEmail.text = user.email ?: ""
 
         FirebaseDatabase.getInstance()
             .getReference("users")
             .child(user.uid)
             .get()
-
             .addOnSuccessListener { snapshot ->
-
                 if (_binding == null) return@addOnSuccessListener
 
-                val fullName =
-                    snapshot.child("fullName")
-                        .value?.toString()
-                        ?: "Người dùng"
-
-                val avatar =
-                    snapshot.child("avatar")
-                        .value?.toString()
-                        ?: ""
+                val fullName = snapshot.child("fullName").value?.toString() ?: "Người dùng"
+                val avatar = snapshot.child("avatar").value?.toString() ?: ""
 
                 binding.txtName.text = fullName
 
                 if (avatar.isNotEmpty()) {
-
                     Glide.with(requireContext())
                         .load(avatar)
                         .placeholder(R.drawable.logo_tran)
@@ -167,131 +124,43 @@ class ProfileFragment : Fragment(), ToolbarConfigProvider {
                         .into(binding.imgAvatar)
                 }
             }
-
             .addOnFailureListener {
-
                 if (_binding == null) return@addOnFailureListener
-
-                binding.txtName.text =
-                    user.displayName ?: "Người dùng"
+                binding.txtName.text = user.displayName ?: "Người dùng"
             }
     }
 
-    private fun loadMyPosts() {
-
-        val uid = auth.currentUser?.uid ?: return
-
-        postsRef = FirebaseDatabase.getInstance()
-            .getReference("posts")
-            .orderByChild("userId")
-            .equalTo(uid)
-
-        postsListener = object : ValueEventListener {
-
-            override fun onDataChange(snapshot: DataSnapshot) {
-
-                if (_binding == null) return
-
-                postList.clear()
-
-                for (data in snapshot.children) {
-
-                    try {
-
-                        val map =
-                            data.value as? Map<String, Any?>
-                                ?: continue
-
-                        val post = Post.fromMap(map)
-
-                        postList.add(post)
-
-                    } catch (e: Exception) {
-
-                        e.printStackTrace()
-                    }
-                }
-
-                // Bài mới nhất lên đầu
-                postList.sortByDescending {
-                    it.createdAt
-                }
-
-                binding.txtPostCount.text =
-                    postList.size.toString()
-
-                adapter.notifyDataSetChanged()
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-
-                if (_binding == null) return
-
-                Toast.makeText(
-                    requireContext(),
-                    error.message,
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-
-        postsRef.addValueEventListener(postsListener!!)
-    }
+    // ─── Actions ──────────────────────────────────────────────────────────────
 
     private fun setupActions() {
-
         binding.btnEditProfile.setOnClickListener {
-
-            val bottomSheet =
-                EditProfileBottomSheet()
-
-            bottomSheet.setOnDismissListener {
-                loadUserInfo()
-            }
-
-            bottomSheet.show(
-                parentFragmentManager,
-                "EditProfileBottomSheet"
-            )
+            val bottomSheet = EditProfileBottomSheet()
+            bottomSheet.setOnDismissListener { loadUserInfo() }
+            bottomSheet.show(parentFragmentManager, "EditProfileBottomSheet")
         }
 
         binding.btnLogout.setOnClickListener {
-
             android.app.AlertDialog.Builder(requireContext())
                 .setTitle("Đăng xuất")
                 .setMessage("Bạn chắc chắn muốn đăng xuất?")
-
                 .setPositiveButton("Đăng xuất") { _, _ ->
-
                     auth.signOut()
-
                     if (_binding == null) return@setPositiveButton
 
-                    Toast.makeText(
-                        requireContext(),
-                        "Đăng xuất thành công",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(requireContext(), "Đăng xuất thành công", Toast.LENGTH_SHORT).show()
 
-                    val intent = Intent(
-                        requireContext(),
-                        LoginActivity::class.java
-                    )
-
-                    intent.flags =
-                        Intent.FLAG_ACTIVITY_NEW_TASK or
-                                Intent.FLAG_ACTIVITY_CLEAR_TASK
-
+                    val intent = Intent(requireContext(), LoginActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    }
                     startActivity(intent)
-
                     requireActivity().finish()
                 }
-
                 .setNegativeButton("Hủy", null)
-
                 .show()
         }
     }
+
+    // ─── Toolbar ──────────────────────────────────────────────────────────────
 
     override fun toolbarConfig() = ToolbarConfig(
         titleResId = R.string.nav_profile,
@@ -300,13 +169,7 @@ class ProfileFragment : Fragment(), ToolbarConfigProvider {
     )
 
     override fun onDestroyView() {
-
-        postsListener?.let {
-            postsRef.removeEventListener(it)
-        }
-
         _binding = null
-
         super.onDestroyView()
     }
 }

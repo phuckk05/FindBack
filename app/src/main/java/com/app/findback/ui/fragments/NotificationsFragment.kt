@@ -8,14 +8,17 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.app.findback.R
 import com.app.findback.databinding.FragmentNotificationsBinding
 import com.app.findback.ui.activities.ChatActivity
 import com.app.findback.ui.adapters.NotificationAdapter
+import com.app.findback.ui.components.SwipeToDeleteCallback
 import com.app.findback.ui.components.toolbar.ToolbarConfig
 import com.app.findback.ui.components.toolbar.ToolbarConfigProvider
 import com.app.findback.ui.viewmodels.NotificationViewModel
+import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 
 class NotificationsFragment : Fragment(), ToolbarConfigProvider {
@@ -39,8 +42,6 @@ class NotificationsFragment : Fragment(), ToolbarConfigProvider {
     private fun setupRecyclerView() {
         adapter = NotificationAdapter { notification ->
             viewModel.markAsRead(notification.id)
-
-
             when (notification.type) {
                 "message" -> {
                     val intent = Intent(requireContext(), ChatActivity::class.java).apply {
@@ -50,7 +51,6 @@ class NotificationsFragment : Fragment(), ToolbarConfigProvider {
                     }
                     startActivity(intent)
                 }
-
             }
         }
 
@@ -58,6 +58,26 @@ class NotificationsFragment : Fragment(), ToolbarConfigProvider {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = this@NotificationsFragment.adapter
         }
+
+        // Gắn swipe-to-delete
+        val swipeCallback = SwipeToDeleteCallback(requireContext()) { position ->
+            val currentList = adapter.currentList
+            if (position < 0 || position >= currentList.size) return@SwipeToDeleteCallback
+
+            val deletedItem = currentList[position]
+
+            // Xóa trên Firebase
+            viewModel.deleteNotification(deletedItem.id)
+
+            // Snackbar hoàn tác
+            Snackbar.make(binding.root, "Đã xóa thông báo", Snackbar.LENGTH_LONG)
+                .setAction("Hoàn tác") {
+                    viewModel.restoreNotification(deletedItem)
+                }
+                .show()
+        }
+
+        ItemTouchHelper(swipeCallback).attachToRecyclerView(binding.rvNotifications)
     }
 
     private fun observeData() {
@@ -70,13 +90,11 @@ class NotificationsFragment : Fragment(), ToolbarConfigProvider {
         }
     }
 
-
-
-
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
     }
+
     override fun toolbarConfig(): ToolbarConfig {
         return ToolbarConfig(
             titleResId = R.string.notifications,

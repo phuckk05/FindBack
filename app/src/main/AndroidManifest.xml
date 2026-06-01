@@ -76,7 +76,7 @@
 
         <activity
             android:name=".ui.activities.ChatActivity"
-            android:launchMode="singleTask"
+            android:launchMode="singleTop"
             android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
@@ -118,6 +118,7 @@
         <activity android:name=".ForgotPasswordActivity" />
         <activity
             android:name=".MainActivity"
+            android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize"
             />
         <activity

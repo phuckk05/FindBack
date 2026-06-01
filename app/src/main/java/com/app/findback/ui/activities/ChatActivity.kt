@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -28,7 +29,6 @@ import androidx.core.net.toUri
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 class ChatActivity : BaseActivity() {
 
@@ -38,7 +38,6 @@ class ChatActivity : BaseActivity() {
         const val EXTRA_OTHER_USER_NAME = "other_user_name"
         const val EXTRA_OTHER_USER_AVATAR = "other_user_avatar"
 
-        // Extra cho preview bài post từ PostDetail
         const val EXTRA_SEND_POST_ID = "SEND_POST_ID"
         const val EXTRA_SEND_POST_TITLE = "SEND_POST_TITLE"
         const val EXTRA_SEND_POST_IMAGE = "SEND_POST_IMAGE"
@@ -69,7 +68,6 @@ class ChatActivity : BaseActivity() {
         )
     }
 
-    // Launchers
     private val locationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -112,10 +110,31 @@ class ChatActivity : BaseActivity() {
             FirebaseAuth.getInstance().currentUser?.uid ?: ""
         )
 
-        handlePostPreviewFromDetail()
+        handlePostPreviewFromIntent(intent)
     }
 
-    private fun handlePostPreviewFromDetail() {
+    fun getCurrentConversationId(): String = conversationId
+
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+
+        val newConvId = intent.getStringExtra(EXTRA_CONVERSATION_ID) ?: ""
+        if (newConvId.isNotEmpty() && newConvId != conversationId) {
+            finish()
+            startActivity(intent.apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            })
+            return
+        }
+
+
+        handlePostPreviewFromIntent(intent)
+    }
+
+
+    private fun handlePostPreviewFromIntent(intent: Intent) {
         val postId = intent.getStringExtra(EXTRA_SEND_POST_ID)
         if (postId.isNullOrEmpty()) return
 
@@ -141,26 +160,23 @@ class ChatActivity : BaseActivity() {
                 .apply(RequestOptions().error(R.drawable.ic_post))
                 .into(binding.ivPreviewPostImage)
 
+            // BUG FIX: Nút "Chọn bài khác" mở PostPicker, không phải btnSendPost dưới input
             binding.btnSendPost.setOnClickListener {
-                val intent = Intent(this, PostPickerActivity::class.java).apply {
+                postPickerLauncher.launch(Intent(this, PostPickerActivity::class.java).apply {
                     putExtra("other_user_id", otherUserId)
                     putExtra("current_user_id", FirebaseAuth.getInstance().currentUser?.uid ?: "")
-                }
-                postPickerLauncher.launch(intent)
+                })
             }
 
             binding.btnCancelPostPreview.setOnClickListener {
-                hidePostPreviewTemporarily()
+                clearPostPreview()
             }
+
             binding.btnSendPostPreview.setOnClickListener {
                 viewModel.sendPostMessage(otherUserId, post)
                 clearPostPreview()
             }
         }
-    }
-
-    private fun hidePostPreviewTemporarily() {
-        binding.layoutPostPreview.isVisible = false
     }
 
     private fun clearPostPreview() {
@@ -179,29 +195,10 @@ class ChatActivity : BaseActivity() {
             if (intent.getBooleanExtra("from_post_detail", false)) {
                 setResult(
                     RESULT_OK,
-                    Intent().apply {
-                        putExtra("open_message_tab", true)
-                    }
+                    Intent().apply { putExtra("open_message_tab", true) }
                 )
-                finish()
-            } else {
-                finish()
             }
-        }
-    }
-
-    @Suppress("DEPRECATION")
-    override fun onBackPressed() {
-        if (intent.getBooleanExtra("from_post_detail", false)) {
-            setResult(
-                RESULT_OK,
-                Intent().apply {
-                    putExtra("open_message_tab", true)
-                }
-            )
             finish()
-        } else {
-            super.onBackPressed()
         }
     }
 
@@ -232,7 +229,10 @@ class ChatActivity : BaseActivity() {
         }
 
         binding.btnSendPost.setOnClickListener {
-            postPickerLauncher.launch(Intent(this, PostPickerActivity::class.java))
+            postPickerLauncher.launch(Intent(this, PostPickerActivity::class.java).apply {
+                putExtra("other_user_id", otherUserId)
+                putExtra("current_user_id", FirebaseAuth.getInstance().currentUser?.uid ?: "")
+            })
         }
 
         binding.btnAttach.setOnClickListener {
@@ -291,19 +291,21 @@ class ChatActivity : BaseActivity() {
             startActivity(mapsIntent)
         } else {
             startActivity(
-                Intent(
-                    Intent.ACTION_VIEW,
-                    "https://maps.google.com/?q=$lat,$lng".toUri()
-                )
+                Intent(Intent.ACTION_VIEW, "https://maps.google.com/?q=$lat,$lng".toUri())
             )
         }
     }
 
+
     private fun openPostDetail(postId: String) {
-        val intent = Intent(this, PostDetailActivity::class.java).apply {
-            putExtra("postId", postId)
+        Log.d("CHAT_POST", "OPEN POST = $postId")
+        if (postId.isBlank()) {
+            showToast("Không tìm thấy bài viết")
+            return
         }
-        startActivity(intent)
+        startActivity(Intent(this, PostDetailActivity::class.java).apply {
+            putExtra("postId", postId)
+        })
     }
 
     private fun showToast(msg: String) {

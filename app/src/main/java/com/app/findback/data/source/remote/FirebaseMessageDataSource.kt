@@ -1,5 +1,7 @@
 package com.app.findback.data.source.remote
 
+
+import android.util.Log
 import com.app.findback.domain.models.*
 import com.google.firebase.database.*
 import kotlinx.coroutines.channels.awaitClose
@@ -13,11 +15,18 @@ import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.RequestBody.Companion.toRequestBody
 
 class FirebaseMessageDataSource {
     private val client = OkHttpClient()
     private val db = FirebaseDatabase.getInstance().reference
 
+    companion object {
+        private const val ONESIGNAL_APP_ID = "bdf5516d-cd73-4dd2-b189-c429f8311bd5"
+
+        private const val ONESIGNAL_REST_API_KEY =
+            "os_v2_app_xx2vc3onong5fmmjyqu7qmi32u7abrmqgebuhbuvhsvyyq7yrxguva46ivw5iuzf22yhaazs7alrtsmtludz23p6eag2gipvyls7ryq"
+    }
     //info users
 
     data class UserInfo(
@@ -327,12 +336,13 @@ class FirebaseMessageDataSource {
         try {
             val receiverSnapshot = db.child("users").child(message.receiverId).get().await()
             val playerId = receiverSnapshot.child("playerId").getValue(String::class.java) ?: return
-            val senderName = receiverSnapshot.child("fullName").getValue(String::class.java) ?: "Người dùng"
-
+            val senderName =
+                receiverSnapshot.child("fullName").getValue(String::class.java) ?: "Người dùng"
 
             val senderSnapshot = db.child("users").child(message.senderId).get().await()
             val senderAvatar = senderSnapshot.child("avatar").getValue(String::class.java) ?: ""
-            val senderDisplayName = senderSnapshot.child("fullName").getValue(String::class.java) ?: "Người dùng"
+            val senderDisplayName =
+                senderSnapshot.child("fullName").getValue(String::class.java) ?: "Người dùng"
 
             val bodyText = when (message.type) {
                 MessageType.POST -> "Đã gửi bài đăng: ${message.post?.title ?: ""}"
@@ -353,13 +363,26 @@ class FirebaseMessageDataSource {
                 )
             )
 
+
             val json = JSONObject().apply {
                 put("app_id", "bdf5516d-cd73-4dd2-b189-c429f8311bd5")
                 put("include_player_ids", JSONArray().put(playerId))
-                put("headings", JSONObject().put("en", senderDisplayName))
-                put("contents", JSONObject().put("en", bodyText))
+
+
+                put("headings", JSONObject().apply {
+                    put("en", senderDisplayName)
+                    put("vi", senderDisplayName)
+                })
+
+                put("contents", JSONObject().apply {
+                    put("en", bodyText)
+                    put("vi", bodyText)
+                })
+
                 put("priority", 10)
                 put("small_icon", "ic_notification")
+
+                // Data để mở app
                 put("data", JSONObject().apply {
                     put("conversationId", message.conversationId)
                     put("otherUserId", message.senderId)
@@ -375,15 +398,22 @@ class FirebaseMessageDataSource {
                 val request = Request.Builder()
                     .url("https://onesignal.com/api/v1/notifications")
                     .post(body)
-                    .addHeader("Authorization", "Key os_v2_app_xx2vc3onong5fmmjyqu7qmi32x5jwsyw33aegwflx6ks3njeykekhmnfnkxjitmxn3wiatmiwgxoi2tkr5quyaoe6dkfqsx4dtlfibi")
+                    .addHeader(
+                        "Authorization",
+                     ONESIGNAL_REST_API_KEY
+                    )
                     .addHeader("Content-Type", "application/json; charset=utf-8")
                     .build()
+
                 val response = client.newCall(request).execute()
-                android.util.Log.d("OneSignal", "Push response: ${response.code}")
+                Log.d(
+                    "OneSignal",
+                    "Push response: ${response.code} | Body: ${response.body?.string()}"
+                )
             }
 
         } catch (e: Exception) {
-            android.util.Log.e("OneSignal", "Push failed", e)
+            Log.e("OneSignal", "Push failed", e)
         }
     }
 

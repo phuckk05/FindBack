@@ -1,4 +1,4 @@
-package com.app.findback.data.repository
+package com.app.findback.domain.repository
 
 import com.app.findback.domain.models.Notification
 import com.app.findback.domain.models.toMap
@@ -74,4 +74,23 @@ class NotificationRepository {
             e.printStackTrace()
         }
     }
+
+    suspend fun deleteNotification(userId: String, notificationId: String) {
+        FirebaseDatabase.getInstance()
+            .getReference("notifications")
+            .child(userId)
+            .child(notificationId)
+            .removeValue()
+            .await()
+    }
+
+    suspend fun restoreNotification(userId: String, notification: Notification) {
+        FirebaseDatabase.getInstance()
+            .getReference("notifications")
+            .child(userId)
+            .child(notification.id)
+            .setValue(notification)
+            .await()
+    }
+
 }

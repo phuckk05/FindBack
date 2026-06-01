@@ -13,94 +13,56 @@ import com.cloudinary.android.MediaManager
 import com.cloudinary.android.callback.ErrorInfo
 import com.cloudinary.android.callback.UploadCallback
 import com.google.firebase.auth.FirebaseAuth
-
 import com.google.firebase.database.FirebaseDatabase
 
 class PostViewModel : ViewModel() {
 
     private val repository = PostRepositoryImpl()
+
     private val _posts = MutableLiveData<List<Post>>(emptyList())
 
+    val posts: LiveData<List<Post>> = _posts
 
     init {
         getPosts()
     }
-    fun getPosts(){
+
+    fun getPosts() {
         repository.getPosts { newPosts ->
             _posts.postValue(newPosts)
+
+            _postsShared.postValue(newPosts)
         }
     }
+
     private val database =
         FirebaseDatabase.getInstance()
             .getReference("posts")
 
+    private val _uploadState = MutableLiveData<UploadState>()
+    val uploadState: LiveData<UploadState> = _uploadState
 
-    private val _uploadState =
-        MutableLiveData<UploadState>()
-
-    val uploadState: LiveData<UploadState>
-            = _uploadState
-
-    private val _postsShared =
-        MutableLiveData<List<Post>>()
-
-    val postsShared: LiveData<List<Post>>
-            = _postsShared
-
-    // =========================================================
-    // UPLOAD STATE
-    // =========================================================
+    private val _postsShared = MutableLiveData<List<Post>>()
+    val postsShared: LiveData<List<Post>> = _postsShared
 
     sealed class UploadState {
-
         object Loading : UploadState()
-
         object Success : UploadState()
-
-        data class Error(
-            val message: String
-        ) : UploadState()
+        data class Error(val message: String) : UploadState()
     }
 
-    // =========================================================
-    // UPLOAD POST
-    // =========================================================
+    fun uploadPost(post: Post, imageUris: List<Uri>) {
+        _uploadState.value = UploadState.Loading
 
-    fun uploadPost(
-        post: Post,
-        imageUris: List<Uri>
-    ) {
-
-        _uploadState.value =
-            UploadState.Loading
-
-        // Không có ảnh
         if (imageUris.isEmpty()) {
-
             savePostToDatabase(post)
-
             return
         }
 
-        // Có ảnh
-        uploadImagesToCloudinary(
-            imageUris = imageUris,
-
-            onComplete = { uploadedUrls ->
-
-                val postWithImages =
-                    post.copy(
-                        imageUrls = uploadedUrls
-                    )
-
-                savePostToDatabase(postWithImages)
-            }
-        )
+        uploadImagesToCloudinary(imageUris = imageUris) { uploadedUrls ->
+            savePostToDatabase(post.copy(imageUrls = uploadedUrls))
+        }
     }
-
-    // =========================================================
-// UPLOAD IMAGES
-// =========================================================
 
     private fun uploadImagesToCloudinary(
         imageUris: List<Uri>,
@@ -121,43 +83,30 @@ class PostViewModel : ViewModel() {
                 .option("folder", "findback/posts")
                 .callback(object : UploadCallback {
                     override fun onStart(requestId: String?) {}
-
                     override fun onProgress(requestId: String?, bytes: Long, totalBytes: Long) {}
-
                     override fun onSuccess(requestId: String?, resultData: MutableMap<Any?, Any?>?) {
                         val imageUrl = resultData?.get("secure_url").toString()
                         uploadedUrls.add(imageUrl)
                         successCount++
-
-                        if (successCount == total) {
-                            onComplete(uploadedUrls)
-                        }
+                        if (successCount == total) onComplete(uploadedUrls)
                     }
-
                     override fun onError(requestId: String?, error: ErrorInfo?) {
                         Log.e("CLOUDINARY", error?.description ?: "Upload failed")
                         _uploadState.value = UploadState.Error("Upload ảnh thất bại")
                     }
-
                     override fun onReschedule(requestId: String?, error: ErrorInfo?) {}
                 })
                 .dispatch()
         }
     }
 
-// =========================================================
-// SAVE POST
-// =========================================================
-
     private fun savePostToDatabase(post: Post) {
         var postToSave = post
 
-        // Nếu có imageUrls thì gán imageUrl = ảnh đầu tiên
         if (post.imageUrls.isNotEmpty() && post.imageUrl.isEmpty()) {
             postToSave = post.copy(imageUrl = post.imageUrls.first())
         }
 
-        // Lấy avatar nếu chưa có
         if (postToSave.userAvatar.isEmpty()) {
             val currentUser = FirebaseAuth.getInstance().currentUser
             postToSave = postToSave.copy(
@@ -172,31 +121,15 @@ class PostViewModel : ViewModel() {
                 loadPosts()
             }
             .addOnFailureListener { exception ->
-                _uploadState.value = UploadState.Error(
-                    "Lưu bài viết thất bại: ${exception.message}"
-                )
+                _uploadState.value = UploadState.Error("Lưu bài viết thất bại: ${exception.message}")
             }
     }
+
     fun loadPosts() {
-        repository.getPosts { posts: List<Post> ->
-
+        repository.getPosts { posts ->
             Log.d("PostViewModel", "Load thành công ${posts.size} bài viết")
-
-            posts.forEach { post ->
-                Log.d(
-                    "PostViewModel",
-                    "Post: ${post.title} | Image: ${post.imageUrl} | Avatar: ${post.userAvatar}"
-                )
-            }
-
-            val validPosts = posts.map { post ->
-                if (post.imageUrl.isEmpty() || post.userAvatar.isEmpty()) {
-                    Log.w("PostViewModel", "Post ${post.title} thiếu ảnh/avatar")
-                }
-                post
-            }
-
-            _postsShared.value = validPosts
+            _posts.postValue(posts)
+            _postsShared.postValue(posts)
         }
     }
 
@@ -204,13 +137,8 @@ class PostViewModel : ViewModel() {
         loadPosts()
     }
 
-    // =========================================================
-    // CLEAN UP
-    // =========================================================
-
     override fun onCleared() {
         super.onCleared()
-
         repository.removeListener()
     }
 

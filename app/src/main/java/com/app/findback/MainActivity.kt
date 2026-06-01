@@ -1,29 +1,33 @@
 package com.app.findback
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
+import android.util.Log
 import androidx.activity.enableEdgeToEdge
-import androidx.lifecycle.lifecycleScope
-import com.app.findback.PopUpNotifications.AppActivityTracker
-import com.app.findback.PopUpNotifications.InAppNotificationManager
+import androidx.appcompat.app.AlertDialog
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.app.findback.databinding.ActivityMainBinding
-import com.app.findback.domain.models.Notification
 import com.app.findback.ui.NotificationHelper
 import com.app.findback.ui.activities.BaseBottomNavActivity
-import com.app.findback.ui.activities.ChatActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.messaging.FirebaseMessaging
 import com.onesignal.OneSignal
-import com.onesignal.notifications.INotificationClickEvent
-import com.onesignal.notifications.INotificationClickListener
-import com.onesignal.notifications.INotificationLifecycleListener
-import com.onesignal.notifications.INotificationWillDisplayEvent
 
 class MainActivity : BaseActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val firebaseAuth = FirebaseAuth.getInstance()
+
+    companion object {
+        private const val REQUEST_CODE_NOTIFICATION = 1001
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,90 +37,109 @@ class MainActivity : BaseActivity() {
         setContentView(binding.root)
 
         NotificationHelper.createNotificationChannel(this)
-        application.registerActivityLifecycleCallbacks(AppActivityTracker)
 
-        setupOneSignalListeners()
-        setToolbar()
-        navigateToMainScreen()
+        // OneSignal đã init trong MyApplication, chỉ cần save ID ở đây
+        saveOneSignalId()
         saveFcmToken()
+        setToolbar()
+
+        // Request permission TRƯỚC, navigate bên trong callback
+        requestNotificationPermission()
     }
 
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            navigateToMainScreen()
+            return
+        }
 
-    private fun setupOneSignalListeners() {
+        when {
+            ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                navigateToMainScreen()
+            }
 
-        OneSignal.Notifications.addForegroundLifecycleListener(object : INotificationLifecycleListener {
-            override fun onWillDisplay(event: INotificationWillDisplayEvent) {
-                val osNotification = event.notification
-                val activity = AppActivityTracker.activeActivity ?: return
-
-                val data = osNotification.additionalData ?: run {
-                    event.preventDefault()
-                    return
-                }
-
-                val currentUserId = getCurrentUserId()
-                if (currentUserId.isBlank()) {
-                    event.preventDefault()
-                    return
-                }
-
-                val otherUserId = data.optString("otherUserId", "")
-
-                if (otherUserId == currentUserId) {
-                    event.preventDefault()
-                    return
-                }
-
-                event.preventDefault()
-
-                val conversationId = data.optString("conversationId", "")
-                val senderName = data.optString("otherUserName", "")
-                    ?: osNotification.title ?: "Người dùng"
-
-                val notificationModel = Notification(
-                    type = "message",
-                    title = senderName,
-                    content = osNotification.body ?: "",
-                    senderName = senderName,
-                    conversationId = conversationId,
-                    senderId = otherUserId,
-                    senderAvatar = ""
-                )
-
-                activity.runOnUiThread {
-                    InAppNotificationManager.show(
-                        activity = activity,
-                        notification = notificationModel
-                    ) { n: Notification ->
-                        val intent = Intent(activity, ChatActivity::class.java).apply {
-                            putExtra(ChatActivity.EXTRA_CONVERSATION_ID, n.conversationId)
-                            putExtra(ChatActivity.EXTRA_OTHER_USER_ID, n.senderId)
-                            putExtra(ChatActivity.EXTRA_OTHER_USER_NAME, n.senderName)
-                            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        }
-                        activity.startActivity(intent)
+            !ActivityCompat.shouldShowRequestPermissionRationale(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) -> {
+                AlertDialog.Builder(this)
+                    .setTitle("Cần bật thông báo")
+                    .setMessage("Thông báo đang bị tắt. Vui lòng vào Cài đặt → Thông báo và bật lên để nhận tin nhắn.")
+                    .setPositiveButton("Mở Cài đặt") { _, _ ->
+                        openAppSettings()
+                        navigateToMainScreen()
                     }
-                }
+                    .setNegativeButton("Bỏ qua") { _, _ -> navigateToMainScreen() }
+                    .setCancelable(false)
+                    .show()
             }
-        })
 
-        OneSignal.Notifications.addClickListener(object : INotificationClickListener {
-            override fun onClick(event: INotificationClickEvent) {
-                val data = event.notification.additionalData ?: return
-                val intent = Intent(this@MainActivity, ChatActivity::class.java).apply {
-                    putExtra(ChatActivity.EXTRA_CONVERSATION_ID, data.optString("conversationId", ""))
-                    putExtra(ChatActivity.EXTRA_OTHER_USER_ID, data.optString("otherUserId", ""))
-                    putExtra(ChatActivity.EXTRA_OTHER_USER_NAME, data.optString("otherUserName", ""))
-                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                startActivity(intent)
-                finish()
+            ActivityCompat.shouldShowRequestPermissionRationale(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) -> {
+                AlertDialog.Builder(this)
+                    .setTitle("Cần quyền thông báo")
+                    .setMessage("Ứng dụng cần quyền thông báo để bạn nhận được tin nhắn kịp thời.")
+                    .setPositiveButton("Đồng ý") { _, _ ->
+                        ActivityCompat.requestPermissions(
+                            this,
+                            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                            REQUEST_CODE_NOTIFICATION
+                        )
+                    }
+                    .setNegativeButton("Từ chối") { _, _ -> navigateToMainScreen() }
+                    .setCancelable(false)
+                    .show()
             }
-        })
+
+            else -> {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    REQUEST_CODE_NOTIFICATION
+                )
+            }
+        }
     }
 
-    private fun getCurrentUserId(): String = firebaseAuth.currentUser?.uid ?: ""
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        if (requestCode == REQUEST_CODE_NOTIFICATION) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                navigateToMainScreen()
+            } else {
+                val permanentlyDenied = !ActivityCompat.shouldShowRequestPermissionRationale(
+                    this, Manifest.permission.POST_NOTIFICATIONS
+                )
+                if (permanentlyDenied) {
+                    AlertDialog.Builder(this)
+                        .setTitle("Thông báo bị tắt")
+                        .setMessage("Bạn đã tắt quyền thông báo. Vui lòng vào Cài đặt để bật lại thủ công.")
+                        .setPositiveButton("Mở Cài đặt") { _, _ ->
+                            openAppSettings()
+                            navigateToMainScreen()
+                        }
+                        .setNegativeButton("Bỏ qua") { _, _ -> navigateToMainScreen() }
+                        .setCancelable(false)
+                        .show()
+                } else {
+                    navigateToMainScreen()
+                }
+            }
+        }
+    }
+
+    private fun openAppSettings() {
+        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+        })
+    }
 
     private fun navigateToMainScreen() {
         startActivity(Intent(this, BaseBottomNavActivity::class.java))
@@ -136,15 +159,24 @@ class MainActivity : BaseActivity() {
         )
     }
 
+    private fun saveOneSignalId() {
+        val uid = firebaseAuth.currentUser?.uid ?: return
+        val subscriptionId = OneSignal.User.pushSubscription.id
+        Log.d("ONESIGNAL_DEBUG", "saveOneSignalId = $subscriptionId")
+        if (!subscriptionId.isNullOrEmpty()) {
+            FirebaseDatabase.getInstance().reference
+                .child("users").child(uid).child("playerId")
+                .setValue(subscriptionId)
+                .addOnSuccessListener { Log.d("ONESIGNAL_DEBUG", "Saved to Firebase") }
+        }
+    }
+
     private fun saveFcmToken() {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        FirebaseMessaging.getInstance().token
-            .addOnSuccessListener { token: String ->
-                FirebaseDatabase.getInstance().reference
-                    .child("users")
-                    .child(uid)
-                    .child("fcmToken")
-                    .setValue(token)
-            }
+        val uid = firebaseAuth.currentUser?.uid ?: return
+        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            FirebaseDatabase.getInstance().reference
+                .child("users").child(uid).child("fcmToken")
+                .setValue(token)
+        }
     }
 }

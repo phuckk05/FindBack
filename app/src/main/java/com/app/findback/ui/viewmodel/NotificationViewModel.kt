@@ -2,8 +2,8 @@ package com.app.findback.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.app.findback.data.repository.NotificationRepository
 import com.app.findback.domain.models.Notification
+import com.app.findback.domain.repository.NotificationRepository
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -50,6 +50,18 @@ class NotificationViewModel : ViewModel() {
     fun markAsRead(notificationId: String) {
         viewModelScope.launch {
             repository.markAsRead(currentUserId, notificationId)
+        }
+    }
+
+    fun deleteNotification(notificationId: String) {
+        viewModelScope.launch {
+            repository.deleteNotification(currentUserId, notificationId)
+        }
+    }
+
+    fun restoreNotification(notification: Notification) {
+        viewModelScope.launch {
+            repository.restoreNotification(currentUserId, notification)
         }
     }
 }

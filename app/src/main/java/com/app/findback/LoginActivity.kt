@@ -1,34 +1,22 @@
 package com.app.findback
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import com.app.findback.databinding.ActivityLoginBinding
 import com.app.findback.ui.activities.BaseBottomNavActivity
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import com.onesignal.OneSignal
+import com.onesignal.notifications.INotificationClickEvent
+import kotlinx.coroutines.*
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
     private lateinit var auth: FirebaseAuth
-
-    private val requestNotificationPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-            if (isGranted) {
-                Toast.makeText(this, "Đã bật thông báo", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Bạn đã từ chối quyền thông báo", Toast.LENGTH_SHORT).show()
-            }
-            navigateToMain()
-        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,7 +32,7 @@ class LoginActivity : AppCompatActivity() {
             startActivity(Intent(this, RegisterActivity::class.java))
         }
         binding.tvForgotPassword.setOnClickListener {
-            startActivity(Intent(this, ForgotPasswordActivity::class.java))
+            startActivity(Intent (this, ForgotPasswordActivity::class.java))
         }
     }
 
@@ -61,19 +49,16 @@ class LoginActivity : AppCompatActivity() {
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
                 showLoading(false)
+
                 if (task.isSuccessful) {
+                    val uid = auth.currentUser?.uid ?: return@addOnCompleteListener
+
+                    // Luu playerId sau khi login thanh cong
+                    savePlayerIdToFirebase(uid)
+
                     Toast.makeText(this, "Đăng nhập thành công", Toast.LENGTH_SHORT).show()
-
-                    // Đăng ký thiết bị với OneSignal sau khi đăng nhập thành công
-                    // OneSignal.initWithContext() đã được gọi trong Application class → gọi login() ở đây là đúng
-                    val userId = auth.currentUser?.uid
-                    if (userId != null) {
-                        OneSignal.login(userId)
-                    }
-
-                    // Xin quyền thông báo — MainActivity sẽ KHÔNG gọi requestPermission() nữa
-                    requestNotificationPermissionIfNeeded()
-
+                    startActivity(Intent(this, BaseBottomNavActivity::class.java))
+                    finish()
                 } else {
                     Toast.makeText(
                         this,
@@ -84,24 +69,33 @@ class LoginActivity : AppCompatActivity() {
             }
     }
 
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this, Manifest.permission.POST_NOTIFICATIONS
-                ) == PackageManager.PERMISSION_GRANTED
-            ) {
-                navigateToMain()
-            } else {
-                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        } else {
-            navigateToMain()
-        }
-    }
+    private fun savePlayerIdToFirebase(uid: String) {
+        val userRef = FirebaseDatabase.getInstance()
+            .getReference("users")
+            .child(uid)
+            .child("playerId")
 
-    private fun navigateToMain() {
-        startActivity(Intent(this, BaseBottomNavActivity::class.java))
-        finish()
+
+        val currentId = OneSignal.User.pushSubscription.id
+        if (!currentId.isNullOrEmpty()) {
+            userRef.setValue(currentId)
+            android.util.Log.d("OneSignal", "Saved playerId immediately: $currentId")
+            return
+        }
+
+
+        CoroutineScope(Dispatchers.IO).launch {
+            repeat(10) { attempt ->
+                delay(500)
+                val id = OneSignal.User.pushSubscription.id
+                if (!id.isNullOrEmpty()) {
+                    userRef.setValue(id)
+                    android.util.Log.d("OneSignal", "Saved playerId after ${(attempt+1)*500}ms: $id")
+                    return@launch
+                }
+            }
+            android.util.Log.e("OneSignal", "Could not get playerId after 5s")
+        }
     }
 
     private fun showLoading(isLoading: Boolean) {

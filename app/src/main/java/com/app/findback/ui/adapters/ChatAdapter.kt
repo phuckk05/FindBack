@@ -1,6 +1,5 @@
 package com.app.findback.ui.adapters
 
-import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -18,6 +17,10 @@ import com.app.findback.domain.models.MessageType
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import com.google.firebase.auth.FirebaseAuth
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.overlay.Marker
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -52,7 +55,6 @@ class ChatAdapter(
     override fun getItemViewType(position: Int): Int {
         val msg = getItem(position)
         val isSent = isMine(msg.senderId)
-
         return when (msg.type) {
             MessageType.TEXT     -> if (isSent) VIEW_TEXT_SENT else VIEW_TEXT_RECEIVED
             MessageType.LOCATION -> if (isSent) VIEW_LOC_SENT else VIEW_LOC_RECEIVED
@@ -74,16 +76,13 @@ class ChatAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val msg = getItem(position)
-        val isSent = isMine(msg.senderId)
         when (holder) {
-            is TextSentVH -> holder.bind(msg)
+            is TextSentVH     -> holder.bind(msg)
             is TextReceivedVH -> holder.bind(msg)
-            is LocationVH -> holder.bind(msg)
-            is PostVH -> holder.bind(msg)
+            is LocationVH     -> holder.bind(msg)
+            is PostVH         -> holder.bind(msg)
         }
     }
-
-    // ==================== VIEW HOLDERS ====================
 
     inner class TextSentVH(private val b: ItemMessageSentBinding) : RecyclerView.ViewHolder(b.root) {
         fun bind(msg: Message) {
@@ -103,11 +102,32 @@ class ChatAdapter(
         private val b: ItemMessageLocationBinding,
         private val isSent: Boolean
     ) : RecyclerView.ViewHolder(b.root) {
+
         fun bind(msg: Message) {
             val loc = msg.location ?: return
             b.tvAddress.text = loc.address.ifEmpty { "Xem trên bản đồ" }
             b.tvTime.text = msg.timestamp.toTimeString()
-            (b.root as? LinearLayout)?.gravity = if (isSent) android.view.Gravity.END else android.view.Gravity.START
+            (b.root as? LinearLayout)?.gravity = if (isSent) Gravity.END else Gravity.START
+
+            val context = b.mapView.context
+            val geo = GeoPoint(loc.latitude, loc.longitude)
+
+            // Set User-Agent để OSM không block
+            Configuration.getInstance().userAgentValue = context.packageName
+
+            b.mapView.apply {
+                setTileSource(TileSourceFactory.MAPNIK)
+                setMultiTouchControls(false)   // tắt zoom/pan trong chat
+                isClickable = false
+                isFocusable = false
+                controller.setZoom(15.0)
+                controller.setCenter(geo)
+                overlays.clear()
+                invalidate()
+            }
+
+            // Click toàn bộ card → mở Google Maps
+            b.mapClickOverlay.setOnClickListener { onLocationClick(loc.latitude, loc.longitude) }
             b.cardLocation.setOnClickListener { onLocationClick(loc.latitude, loc.longitude) }
         }
     }

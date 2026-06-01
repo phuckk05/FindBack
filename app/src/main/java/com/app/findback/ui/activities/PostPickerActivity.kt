@@ -3,6 +3,7 @@ package com.app.findback.ui.activities
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import androidx.activity.viewModels
 import com.app.findback.BaseActivity
 import com.app.findback.databinding.ActivityPostPickerBinding
@@ -33,20 +34,29 @@ class PostPickerActivity : BaseActivity() {
             adapter = this@PostPickerActivity.adapter
         }
 
-
-        postViewModel.postsShared.observe(this) { posts ->
-            val filterd = posts.filter { post ->
-                post.userId == otherUserId || post.userId == currentUserId
+        postViewModel.posts.observe(this) { posts ->
+            val filtered = if (otherUserId.isEmpty() && currentUserId.isEmpty()) {
+                posts
+            } else {
+                posts.filter { post ->
+                    post.userId == otherUserId || post.userId == currentUserId
+                }
             }
-            adapter.submitList(filterd)
+            adapter.submitList(filtered)
         }
+
+
+        postViewModel.refreshPosts()
     }
 
     private fun returnPost(post: Post) {
         val result = Intent().apply {
             putExtra("post_id", post.postId)
             putExtra("post_title", post.title)
-            putExtra("post_image", post.imageUrl)
+
+            putExtra("post_image", post.imageUrl.ifEmpty {
+                post.imageUrls.firstOrNull() ?: ""
+            })
             putExtra("post_desc", post.description)
         }
         setResult(Activity.RESULT_OK, result)
