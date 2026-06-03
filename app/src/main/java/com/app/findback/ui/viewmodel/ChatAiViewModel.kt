@@ -35,14 +35,14 @@ class ChatAiViewModel : ViewModel() {
     }
     //get message
     fun getMessages(userId: String){
-     viewModelScope.launch {
-         try {
-             chatAiRepository.getMessages(userId,{ messages ->
-                 _messages.postValue(messages)
-             })
-         }catch (e: Exception){
-             Log.e("CHAT_AI", "getMessages error", e)
-         }
-     }
+        viewModelScope.launch {
+            try {
+                chatAiRepository.getMessages(userId,{ messages ->
+                    _messages.postValue(messages)
+                })
+            }catch (e: Exception){
+                Log.e("CHAT_AI", "getMessages error", e)
+            }
+        }
     }
 }

@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.app.findback.R
 import com.app.findback.databinding.FragmentHomeBinding
 import com.app.findback.domain.models.Post
@@ -36,15 +37,13 @@ class HomeFragment : Fragment(), ToolbarConfigProvider {
 
     private lateinit var homeAdapter: HomeAdapter
     private lateinit var postViewModel: PostViewModel
-
     private val notificationViewModel: NotificationViewModel by viewModels()
 
     private var allPosts: List<Post> = emptyList()
     private var currentUnreadCount = 0
 
-    // ─────────────────────────────────────────────────────────────
-    // Lifecycle
-    // ─────────────────────────────────────────────────────────────
+    private var pendingTargetPostId: String? = null
+    private var pendingScrollToComment: Boolean = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -57,15 +56,25 @@ class HomeFragment : Fragment(), ToolbarConfigProvider {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         setControl()
         setEvent()
         observeNotificationBadge()
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Setup
-    // ─────────────────────────────────────────────────────────────
+    fun setPendingNotificationTarget(postId: String, scrollToComment: Boolean) {
+        pendingTargetPostId = postId
+        pendingScrollToComment = scrollToComment
+
+        if (_binding == null) return
+
+        binding.rvPosts.post {
+            scrollAndExpandComment()
+        }
+    }
+
+    fun handleNotificationNavigation(postId: String, scrollToComment: Boolean) {
+        setPendingNotificationTarget(postId, scrollToComment)
+    }
 
     private fun setControl() {
         postViewModel = ViewModelProvider(requireActivity())[PostViewModel::class.java]
@@ -76,41 +85,28 @@ class HomeFragment : Fragment(), ToolbarConfigProvider {
         setupRecyclerView()
         observePosts()
         setupChipFilter()
-        //setupSwipeRefresh()
-
-        postViewModel.loadPosts()
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // RecyclerView
-    // ─────────────────────────────────────────────────────────────
-
     private fun setupRecyclerView() {
-        // Main Posts
+        homeAdapter.setHasStableIds(true)
+
         binding.rvPosts.layoutManager = GridLayoutManager(requireContext(), 1).apply {
             orientation = LinearLayoutManager.VERTICAL
         }
         binding.rvPosts.adapter = homeAdapter
 
-        // Suggest Posts (Horizontal)
-        binding.rvPostsSuggest.layoutManager = GridLayoutManager(requireContext(), 1).apply {
-            orientation = LinearLayoutManager.HORIZONTAL
-        }
-        binding.rvPostsSuggest.adapter = homeAdapter
-
         homeAdapter.setOnItemClickListener(object : HomeAdapter.OnItemClickListener {
             override fun onItemClick(position: Int) {
-                val post = allPosts[position]
-
+                val post = homeAdapter.getCurrentList()[position]
                 val intent = Intent(requireContext(), PostDetailActivity::class.java).apply {
                     putExtra("postId", post.postId)
-                    putExtra("post", post)           // Truyền full object
+                    putExtra("post", post)
                 }
                 startActivity(intent)
             }
 
             override fun onItemClickShare(position: Int) {
-                val postId = allPosts[position].postId
+                val postId = homeAdapter.getCurrentList()[position].postId
                 val link = "https://metalk-a52fb.web.app/post/$postId"
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
@@ -120,20 +116,50 @@ class HomeFragment : Fragment(), ToolbarConfigProvider {
             }
 
             override fun onItemClickChat(position: Int) {
-                openChatWithPostOwner(allPosts[position])
+                openChatWithPostOwner(homeAdapter.getCurrentList()[position])
             }
         })
     }
-
-    // ─────────────────────────────────────────────────────────────
-    // Observe Posts
-    // ─────────────────────────────────────────────────────────────
 
     private fun observePosts() {
         postViewModel.postsShared.observe(viewLifecycleOwner) { posts ->
             allPosts = posts
             applyCurrentFilter()
+
+            if (pendingTargetPostId != null && pendingScrollToComment) {
+                binding.rvPosts.post {
+                    scrollAndExpandComment()
+                }
+            }
         }
+    }
+
+    private fun scrollAndExpandComment() {
+        val postId = pendingTargetPostId ?: return
+        Log.d("NAV_DEBUG", "scrollAndExpandComment: postId=$postId")
+
+        val adapterList = homeAdapter.getCurrentList()
+        val position = adapterList.indexOfFirst { it.postId == postId }
+        if (position == -1) {
+            pendingTargetPostId = null
+            pendingScrollToComment = false
+            return
+        }
+
+        pendingTargetPostId = null
+        pendingScrollToComment = false
+
+        val rv = binding.rvPosts
+        rv.smoothScrollToPosition(position)
+
+        rv.postDelayed({
+            Log.d("NAV_DEBUG", "Calling expandCommentForPost after scroll")
+            homeAdapter.expandCommentForPost(postId)
+
+            rv.postDelayed({
+                rv.smoothScrollToPosition(position)
+            }, 400)
+        }, 600)
     }
 
     private fun observeNotificationBadge() {
@@ -145,10 +171,6 @@ class HomeFragment : Fragment(), ToolbarConfigProvider {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Chip Filter
-    // ─────────────────────────────────────────────────────────────
-
     private fun setupChipFilter() {
         binding.cgChip.check(binding.cgChip.getChildAt(0).id)
         binding.cgChip.setOnCheckedStateChangeListener { _, _ ->
@@ -158,44 +180,15 @@ class HomeFragment : Fragment(), ToolbarConfigProvider {
 
     private fun applyCurrentFilter() {
         val checkedId = binding.cgChip.checkedChipId
-        val chipText = binding.cgChip
-            .findViewById<Chip>(checkedId)
-            ?.text?.toString() ?: ""
+        val chipText = binding.cgChip.findViewById<Chip>(checkedId)?.text?.toString() ?: ""
 
         val filteredPosts = when {
-            chipText.contains("Thất lạc", ignoreCase = true) ->
-                allPosts.filter { it.postType == "lost" }
-
-            chipText.contains("Tìm thấy", ignoreCase = true) ->
-                allPosts.filter { it.postType == "found" }
-
-            chipText.contains("Gần tôi", ignoreCase = true) ->
-                allPosts // TODO: filter by location
-
+            chipText.contains("Thất lạc", ignoreCase = true) -> allPosts.filter { it.postType == "lost" }
+            chipText.contains("Tìm thấy", ignoreCase = true) -> allPosts.filter { it.postType == "found" }
             else -> allPosts
         }
 
         homeAdapter.addNewData(filteredPosts)
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Actions
-    // ─────────────────────────────────────────────────────────────
-
-    private fun setEventClickSearch() {
-        startActivity(Intent(requireContext(), SearchPostActivity::class.java))
-    }
-
-    private fun openNotificationsScreen() {
-        val activity = requireActivity()
-        if (activity is BaseBottomNavActivity) {
-            activity.openNotificationsFragment()
-        } else {
-            activity.supportFragmentManager.beginTransaction()
-                .replace(R.id.fragmentContainer, NotificationsFragment())
-                .addToBackStack(null)
-                .commit()
-        }
     }
 
     private fun openChatWithPostOwner(post: Post) {
@@ -222,10 +215,6 @@ class HomeFragment : Fragment(), ToolbarConfigProvider {
         (requireActivity() as? BaseBottomNavActivity)?.refreshToolbarForActiveFragment()
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Toolbar
-    // ─────────────────────────────────────────────────────────────
-
     override fun toolbarConfig() = ToolbarConfig(
         titleResId = R.string.app_name,
         isBack = false,
@@ -238,12 +227,20 @@ class HomeFragment : Fragment(), ToolbarConfigProvider {
         onIB2 = { setEventClickSearch() }
     )
 
-    // ─────────────────────────────────────────────────────────────
-    // Destroy
-    // ─────────────────────────────────────────────────────────────
+    private fun setEventClickSearch() {
+        startActivity(Intent(requireContext(), SearchPostActivity::class.java))
+    }
+
+    private fun openNotificationsScreen() {
+        val activity = requireActivity()
+        if (activity is BaseBottomNavActivity) {
+            activity.openNotificationsFragment()
+        }
+    }
 
     override fun onDestroyView() {
         super.onDestroyView()
+        homeAdapter.removeAllListeners()
         postViewModel.removeListener()
         _binding = null
     }

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1069229068834",
+    "firebase_url": "https://metalk-a52fb-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "metalk-a52fb",
+    "storage_bucket": "metalk-a52fb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1069229068834:android:3c6d0d3879ee996b71b07b",
+        "android_client_info": {
+          "package_name": "com.app.findback"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1069229068834-amg8hao8lf6kd1lplip3a55cj52mgog1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.app.findback",
+            "certificate_hash": "a6c5cdd71ec70b96915316ace45497df72dcfb74"
+          }
+        },
+        {
+          "client_id": "1069229068834-fsn3hb6b4chvor2nuu4fh3d875noishv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTV8cQVy2iror-V3a72Q3UFu5_is9ZGRM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1069229068834-fsn3hb6b4chvor2nuu4fh3d875noishv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

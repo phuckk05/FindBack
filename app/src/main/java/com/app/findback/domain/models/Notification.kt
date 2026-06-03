@@ -13,19 +13,20 @@ data class Notification(
     val postId: String = "",
     val timestamp: Long = System.currentTimeMillis(),
     val isRead: Boolean = false
-)
+) {
 
-fun Notification.toMap(): Map<String, Any?> = mapOf(
-    "id" to id,
-    "userId" to userId,
-    "type" to type,
-    "title" to title,
-    "content" to content,
-    "senderId" to senderId,
-    "senderName" to senderName,
-    "senderAvatar" to senderAvatar,
-    "conversationId" to conversationId,
-    "postId" to postId,
-    "timestamp" to timestamp,
-    "isRead" to isRead
-)
+    fun toMap(): Map<String, Any?> = mapOf(
+        "id" to id,
+        "userId" to userId,
+        "type" to type,
+        "title" to title,
+        "content" to content,
+        "senderId" to senderId,
+        "senderName" to senderName,
+        "senderAvatar" to senderAvatar,
+        "conversationId" to conversationId,
+        "postId" to postId,
+        "timestamp" to timestamp,
+        "isRead" to isRead
+    )
+}

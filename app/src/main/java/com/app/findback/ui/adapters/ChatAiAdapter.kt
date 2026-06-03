@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.app.findback.databinding.ItemMessageReceivedAiBinding
 import com.app.findback.databinding.ItemMessageReceivedBinding
 import com.app.findback.databinding.ItemMessageSentBinding
 import com.app.findback.domain.models.ChatMessage
@@ -45,7 +46,7 @@ class ChatAiAdapter(
             )
             UserViewHolder(binding)
         } else {
-            val binding = ItemMessageReceivedBinding.inflate(
+            val binding = ItemMessageReceivedAiBinding.inflate(
                 LayoutInflater.from(parent.context), parent, false
             )
             AiViewHolder(binding)
@@ -74,24 +75,30 @@ class ChatAiAdapter(
     }
 
     // AI
-    class AiViewHolder(private val binding: ItemMessageReceivedBinding) : RecyclerView.ViewHolder(binding.root) {
+    class AiViewHolder(private val binding: ItemMessageReceivedAiBinding) : RecyclerView.ViewHolder(binding.root) {
         private val postsAdapter = PostAiAdapter(emptyList())
 
+        init {
+            binding.recyclerViewPosts.layoutManager = LinearLayoutManager(binding.root.context, LinearLayoutManager.VERTICAL, false)
+            binding.recyclerViewPosts.isNestedScrollingEnabled = false
+            binding.recyclerViewPosts.adapter = postsAdapter
+        }
 
 
         fun bind(item: ChatMessage, allPosts: List<Post>) {
-            binding.tvMessage.text = item.content
+            binding.textViewMessage.text = item.content
 
             val matchedPosts = item.postId.mapNotNull { id ->
                 allPosts.find { it.postId == id }
             }
 
-           /* if (matchedPosts.isEmpty()) {
+            if (matchedPosts.isEmpty()) {
                 binding.recyclerViewPosts.visibility = View.GONE
             } else {
+                Log.d("abs",matchedPosts.toString())
                 binding.recyclerViewPosts.visibility = View.VISIBLE
                 postsAdapter.submitList(matchedPosts)
-            }*/
+            }
         }
     }
 }

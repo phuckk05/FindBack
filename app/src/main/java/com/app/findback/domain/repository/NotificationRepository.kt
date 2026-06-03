@@ -1,7 +1,6 @@
 package com.app.findback.domain.repository
 
 import com.app.findback.domain.models.Notification
-import com.app.findback.domain.models.toMap
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase

@@ -1,7 +1,14 @@
 package com.app.findback
 
+import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.os.CountDownTimer
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.TextPaint
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -28,6 +35,7 @@ class RegisterActivity : AppCompatActivity() {
     private val SERVICE_ID = "service_3v7um35"
     private val TEMPLATE_ID = "template_at9xpp9"
     private val PUBLIC_KEY = "afe6Bpob5V-3FRdZa"
+    private val PRIVATE_KEY = "YOUR_EMAILJS_PRIVATE_KEY" // Lấy tại: EmailJS Dashboard → Account → Private Key
     // ==============================
 
     private var generatedOtp: String = ""
@@ -41,6 +49,7 @@ class RegisterActivity : AppCompatActivity() {
 
         auth = FirebaseAuth.getInstance()
         setupListeners()
+        setupLoginLink()
     }
 
     private fun setupListeners() {
@@ -67,6 +76,7 @@ class RegisterActivity : AppCompatActivity() {
             put("service_id", SERVICE_ID)
             put("template_id", TEMPLATE_ID)
             put("user_id", PUBLIC_KEY)
+            put("accessToken", PRIVATE_KEY) // Fix: dùng private key thay vì origin header
             put("template_params", JSONObject().apply {
                 put("to_email", email)
                 put("otp_code", generatedOtp)
@@ -98,9 +108,10 @@ class RegisterActivity : AppCompatActivity() {
                         ).show()
                         startCountDown()
                     } else {
+                        val errorBody = response.body?.string()
                         Toast.makeText(
                             this@RegisterActivity,
-                            "Gửi OTP thất bại: ${response.body?.string()}",
+                            "Gửi OTP thất bại: $errorBody",
                             Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -131,13 +142,9 @@ class RegisterActivity : AppCompatActivity() {
     private fun attemptRegister() {
 
         val fullName = binding.etFullName.text.toString().trim()
-
         val email = binding.etEmail.text.toString().trim()
-
         val phone = binding.etPhone.text.toString().trim()
-
         val password = binding.etPassword.text.toString().trim()
-
         val inputOtp = binding.etOtp.text.toString().trim()
 
         if (fullName.isEmpty()) {
@@ -166,7 +173,6 @@ class RegisterActivity : AppCompatActivity() {
         }
 
         when {
-
             generatedOtp.isEmpty() -> {
                 Toast.makeText(this, "Vui lòng nhấn 'Gửi mã' trước", Toast.LENGTH_SHORT).show()
                 return
@@ -189,22 +195,12 @@ class RegisterActivity : AppCompatActivity() {
             .addOnCompleteListener { task ->
 
                 if (task.isSuccessful) {
-
                     val uid = auth.currentUser!!.uid
-
-                    saveUserToDatabase(
-                        uid,
-                        fullName,
-                        email,
-                        phone
-                    )
-
+                    saveUserToDatabase(uid, fullName, email, phone)
                 } else {
-
                     showLoading(false)
 
                     when (task.exception) {
-
                         is FirebaseAuthUserCollisionException ->
                             binding.etEmail.error = "Email đã tồn tại"
 
@@ -212,11 +208,7 @@ class RegisterActivity : AppCompatActivity() {
                             binding.etPassword.error = "Mật khẩu quá yếu"
 
                         else ->
-                            Toast.makeText(
-                                this,
-                                task.exception?.message,
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            Toast.makeText(this, task.exception?.message, Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -240,42 +232,22 @@ class RegisterActivity : AppCompatActivity() {
             .child(uid)
             .setValue(user)
             .addOnSuccessListener {
-
-                Toast.makeText(
-                    this,
-                    "Đăng ký thành công!",
-                    Toast.LENGTH_SHORT
-                ).show()
-
                 showLoading(false)
-
                 generatedOtp = ""
 
-                // Chuyển sang LoginActivity
-                startActivity(
-                    android.content.Intent(
-                        this,
-                        LoginActivity::class.java
-                    )
-                )
+                Toast.makeText(this, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
 
-                // Đăng xuất sau khi lưu thành công
                 auth.signOut()
 
+                startActivity(
+                    android.content.Intent(this, LoginActivity::class.java)
+                )
                 finish()
             }
-
             .addOnFailureListener { e ->
-
                 e.printStackTrace()
-
                 showLoading(false)
-
-                Toast.makeText(
-                    this,
-                    "Lưu thất bại: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(this, "Lưu thất bại: ${e.message}", Toast.LENGTH_LONG).show()
             }
     }
 
@@ -288,5 +260,22 @@ class RegisterActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         countDownTimer?.cancel()
+    }
+    private fun setupLoginLink() {
+        val full = "Đã có tài khoản? Đăng nhập"
+        val spannable = SpannableStringBuilder(full)
+        val start = full.indexOf("Đăng nhập")
+        spannable.setSpan(object : ClickableSpan() {
+            override fun onClick(w: View) {
+                startActivity(Intent(this@RegisterActivity, LoginActivity::class.java))
+            }
+            override fun updateDrawState(ds: TextPaint) {
+                ds.color = Color.parseColor("#1565F9")
+                ds.isUnderlineText = false
+            }
+        }, start, full.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+        binding.tvLogin.text = spannable
+        binding.tvLogin.movementMethod = LinkMovementMethod.getInstance()
+        binding.tvLogin.highlightColor = Color.TRANSPARENT
     }
 }

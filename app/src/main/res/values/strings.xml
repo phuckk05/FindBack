@@ -11,7 +11,7 @@
     <string name="ai_chat">Trò chuyện với AI</string>
     <string name="inputPrompt">Nhập tin nhắn...</string>
     <string name="back">Quay lại</string>
-    <string name="send">Gửi</string>
+
     <string name="attach">Đính kèm</string>
     <string name="send_location">Gửi vị trí</string>
     <string name="send_post">Gửi bài đăng</string>
@@ -49,6 +49,11 @@
         Ví dụ: Ví da màu đen, bên trong có CCCD và thẻ ngân hàng tên Nguyễn Văn A...
     </string>
 
+    <string name="share">Chia sẻ</string>
+    <string name="message">Nhắn tin</string>
+    <string name="edit">Sửa</string>
+    <string name="delete">Xóa</string>
+
     <!-- ===== IMAGE ===== -->
     <string name="image_label">Hình ảnh đính kèm</string>
     <string name="add_image">Thêm ảnh</string>
@@ -65,6 +70,22 @@
     <!-- ===== SUCCESS ===== -->
     <string name="post_success">Đăng bài thành công</string>
     <string name="post_failed">Đăng bài thất bại</string>
+
+    <!-- Comment & Notification -->
+    <string name="comment">Bình luận</string>
+    <string name="comment_count">Bình luận (%1$d)</string>
+    <string name="write_comment">Viết bình luận...</string>
+    <string name="send">Gửi</string>
+    <string name="just_posted">Vừa đăng</string>
+    <string name="minutes_ago">phút trước</string>
+    <string name="hours_ago">giờ trước</string>
+    <string name="days_ago">ngày trước</string>
+    <string name="unknown_location">Không rõ vị trí</string>
+    <string name="loading">Đang tải...</string>
+    <string name="anonymous">Ẩn danh</string>
+    <string name="user">Người dùng</string>
+    <string name="please_login">Vui lòng đăng nhập</string>
+    <string name="send_failed">Gửi thất bại</string>
 
 
 </resources>

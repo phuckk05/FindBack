@@ -38,12 +38,10 @@ class MainActivity : BaseActivity() {
 
         NotificationHelper.createNotificationChannel(this)
 
-        // OneSignal đã init trong MyApplication, chỉ cần save ID ở đây
         saveOneSignalId()
         saveFcmToken()
         setToolbar()
 
-        // Request permission TRƯỚC, navigate bên trong callback
         requestNotificationPermission()
     }
 
@@ -142,7 +140,12 @@ class MainActivity : BaseActivity() {
     }
 
     private fun navigateToMainScreen() {
-        startActivity(Intent(this, BaseBottomNavActivity::class.java))
+        val intent = Intent(this, BaseBottomNavActivity::class.java).apply {
+            // Truyền hết extras từ thông báo sang
+            putExtras(getIntent().extras ?: Bundle())
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        startActivity(intent)
         finish()
     }
 

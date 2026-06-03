@@ -9,11 +9,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import com.onesignal.OneSignal
+import kotlinx.coroutines.CoroutineScope
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.RequestBody.Companion.toRequestBody
 
@@ -25,7 +27,7 @@ class FirebaseMessageDataSource {
         private const val ONESIGNAL_APP_ID = "bdf5516d-cd73-4dd2-b189-c429f8311bd5"
 
         private const val ONESIGNAL_REST_API_KEY =
-            "os_v2_app_xx2vc3onong5fmmjyqu7qmi32u7abrmqgebuhbuvhsvyyq7yrxguva46ivw5iuzf22yhaazs7alrtsmtludz23p6eag2gipvyls7ryq"
+            "os_v2_app_xx2vc3onong5fmmjyqu7qmi32ucyy6eehpguttmebpdnznifuup56uricbpv7spb2ucqzme2tadperhnrtdjjg4lt7ld46rdkch4rsi"
     }
     //info users
 
@@ -425,6 +427,75 @@ class FirebaseMessageDataSource {
             ref.child(notiId).setValue(finalNoti.toMap()).await()
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    suspend fun sendCommentNotification(notification: Notification) {
+        saveNotification(notification)
+    }
+    fun sendNotification(notification: Notification) {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            try {
+                saveNotification(notification)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    fun sendCommentPushNotification(
+        receiverId: String,
+        senderName: String,
+        content: String,
+        postId: String
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val receiverSnapshot = db.child("users").child(receiverId).get().await()
+                val playerId = receiverSnapshot.child("playerId").getValue(String::class.java) ?: return@launch
+
+                val json = JSONObject().apply {
+                    put("app_id", ONESIGNAL_APP_ID)
+                    put("include_player_ids", JSONArray().put(playerId))
+
+                    put("headings", JSONObject().apply {
+                        put("vi", senderName)
+                        put("en", senderName)
+                    })
+
+                    put("contents", JSONObject().apply {
+                        put("vi", content)
+                        put("en", content)
+                    })
+
+                    put("priority", 10)
+                    put("small_icon", "ic_notification")
+
+                    // Data để mở app khi bấm vào thông báo
+                    put("data", JSONObject().apply {
+                        put("type", "new_comment")
+                        put("postId", postId)
+                        put("senderName", senderName)
+                    })
+                }
+
+                val body = RequestBody.create(
+                    "application/json; charset=utf-8".toMediaType(),
+                    json.toString()
+                )
+
+                val request = Request.Builder()
+                    .url("https://onesignal.com/api/v1/notifications")
+                    .post(body)
+                    .addHeader("Authorization", ONESIGNAL_REST_API_KEY)
+                    .addHeader("Content-Type", "application/json; charset=utf-8")
+                    .build()
+
+                val response = client.newCall(request).execute()
+                Log.d("OneSignal_Comment", "Push response: ${response.code}")
+
+            } catch (e: Exception) {
+                Log.e("OneSignal_Comment", "Push failed", e)
+            }
         }
     }
 }

@@ -13,6 +13,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
+import androidx.lifecycle.ViewModelProvider
 import androidx.fragment.app.Fragment
 import com.google.android.material.appbar.AppBarLayout
 import com.app.findback.BaseActivity
@@ -34,7 +35,6 @@ class BaseBottomNavActivity : BaseActivity() {
 
     private lateinit var binding: ActivityBaseBottomNavBinding
 
-    // Fragments
     private val homeFragment = HomeFragment()
     private val mapFragment = MapFragment()
     private val addFragment = AddStatusFragment()
@@ -53,7 +53,6 @@ class BaseBottomNavActivity : BaseActivity() {
         )
     }
 
-    private lateinit var postViewModel: PostViewModel
     private lateinit var circleZoneViewModel: CircleZoneViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,9 +70,11 @@ class BaseBottomNavActivity : BaseActivity() {
         setBottomNavInsert()
         handleIntent(intent)
         getPosts()
-
-        // Nếu có extra open_chat từ notification click → mở ChatActivity luôn
         handleOpenChatFromNotification(intent)
+
+        binding.root.post {
+            handleNotificationToHome(intent)
+        }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -95,19 +96,20 @@ class BaseBottomNavActivity : BaseActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+
         if (intent.getBooleanExtra("open_message_tab", false)) {
             openMessageFragment()
         }
-        handleIntent(intent)
 
-        // Xử lý notification click khi app đang foreground và BaseBottomNavActivity đã tồn tại
+        handleIntent(intent)
         handleOpenChatFromNotification(intent)
+
+
+        binding.root.post {
+            handleNotificationToHome(intent)
+        }
     }
 
-    /**
-     * Xử lý mở ChatActivity khi user ấn notification từ ngoài app.
-     * MainActivity gửi extra "open_chat" = true kèm conversation info.
-     */
     private fun handleOpenChatFromNotification(intent: Intent) {
         if (!intent.getBooleanExtra("open_chat", false)) return
 
@@ -115,7 +117,6 @@ class BaseBottomNavActivity : BaseActivity() {
         val otherUserId = intent.getStringExtra(ChatActivity.EXTRA_OTHER_USER_ID) ?: return
         val otherUserName = intent.getStringExtra(ChatActivity.EXTRA_OTHER_USER_NAME) ?: ""
 
-        // Xóa flag để tránh mở lại khi onNewIntent được gọi nhiều lần
         intent.removeExtra("open_chat")
 
         startActivity(Intent(this, ChatActivity::class.java).apply {
@@ -130,7 +131,6 @@ class BaseBottomNavActivity : BaseActivity() {
 
     fun setControl() {
         binding = ActivityBaseBottomNavBinding.inflate(layoutInflater)
-        postViewModel = PostViewModel()
         circleZoneViewModel = CircleZoneViewModel()
     }
 
@@ -289,7 +289,9 @@ class BaseBottomNavActivity : BaseActivity() {
     }
 
     private fun getPosts() {
-        postViewModel.getPosts()
+        // ViewModelProvider(this) → cùng instance với HomeFragment (dùng requireActivity())
+        // PostViewModel.init {} tự gọi getPosts() khi khởi tạo → không cần gọi thêm
+        ViewModelProvider(this)[PostViewModel::class.java]
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -369,5 +371,27 @@ class BaseBottomNavActivity : BaseActivity() {
         binding.bottomNav.postDelayed({
             applyToolbarForFragment(notificationsFragment)
         }, 150)
+    }
+
+    private fun handleNotificationToHome(intent: Intent) {
+        val targetPostId = intent.getStringExtra("targetPostId") ?: return
+        val scrollToComment = intent.getBooleanExtra("scrollToComment", false)
+        if (!scrollToComment) return
+
+        intent.removeExtra("targetPostId")
+        intent.removeExtra("scrollToComment")
+
+        Log.d("NAV_DEBUG", "handleNotificationToHome: postId=$targetPostId")
+
+        // Luôn chuyển về Home tab
+        if (activeFragment !== homeFragment) {
+            binding.bottomNav.selectedItemId = R.id.nav_home
+            supportFragmentManager.executePendingTransactions()
+        }
+
+        // Đợi fragment sẵn sàng
+        binding.root.postDelayed({
+            homeFragment.handleNotificationNavigation(targetPostId, true)
+        }, 400)
     }
 }

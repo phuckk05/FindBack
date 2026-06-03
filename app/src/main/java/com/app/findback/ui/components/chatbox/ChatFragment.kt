@@ -18,6 +18,7 @@ import com.app.findback.domain.models.Post
 import com.app.findback.ui.adapters.ChatAiAdapter
 import com.app.findback.ui.viewmodel.ChatAiViewModel
 import com.app.findback.ui.viewmodel.PostViewModel
+import com.google.firebase.auth.FirebaseAuth
 
 
 class ChatFragment : Fragment() {
@@ -28,6 +29,8 @@ class ChatFragment : Fragment() {
     private var allPosts: List<Post> = emptyList()
     private var _binding: FragmentChatBinding? = null
     private val binding get() = _binding!!
+
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: "0"
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -84,7 +87,7 @@ class ChatFragment : Fragment() {
     // xử lý gửi tin nhắn
     private fun setEvent() {
         // gọi lấy messages realtime (ViewModel sẽ lắng nghe DB và update LiveData)
-        chatAiViewModel.getMessages("1234")
+        chatAiViewModel.getMessages(currentUserId)
 
         binding.btnSend.setOnClickListener {
             val messageText = binding.editTextMessage.text.toString().trim()
@@ -107,7 +110,7 @@ class ChatFragment : Fragment() {
             binding.editTextMessage.text.clear()
 
             // chuẩn bị session: tạo bản sao mutable của lịch sử (không ép kiểu)
-            val session = ChatSession(userId = "1234", messages = allMessages.toMutableList())
+            val session = ChatSession(currentUserId, messages = allMessages.toMutableList())
 
             // call viewmodel để gửi thật lên Firebase + AI
             // bọc try/catch ở viewmodel/ repository để handle lỗi (xem phần dưới)

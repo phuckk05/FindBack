@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="12dp"
+    android:paddingBottom="8dp">
+
+    <!-- Danh sách comment -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvInlineComments"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:nestedScrollingEnabled="false"
+        android:layout_marginTop="8dp"/>
+
+    <!-- Input area -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="8dp">
+
+        <EditText
+            android:id="@+id/etInlineComment"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="@string/write_comment"
+            android:textSize="13sp"
+            android:maxLines="3"
+            android:background="@drawable/bg_input_round"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"
+            android:inputType="textMultiLine|textCapSentences"/>
+
+        <ImageButton
+            android:id="@+id/btnSendInlineComment"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_circle_primary"
+            android:src="@drawable/ic_send"
+            app:tint="@color/white"
+            android:contentDescription="@string/send"
+            android:scaleType="centerInside"/>
+    </LinearLayout>
+</LinearLayout>

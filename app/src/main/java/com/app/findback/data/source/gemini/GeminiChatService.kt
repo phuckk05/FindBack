@@ -142,7 +142,7 @@ LUÔN trả về JSON đúng format sau:
 }
 
 QUY TẮC:
-- reply: luôn là câu trả lời tự nhiên
+- reply: luôn là câu trả lời tự nhiên, không chứa id của bài post
 - postIds: danh sách id bài đăng phù hợp (có thể rỗng [])
 - KHÔNG trả thêm text ngoài JSON
 """.trimIndent()

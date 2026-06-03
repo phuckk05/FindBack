@@ -7,13 +7,13 @@
     app:cardCornerRadius="0dp"
     app:strokeWidth="1dp"
     app:strokeColor="@color/white"
-    app:cardBackgroundColor="@color/white"
-    >
+    app:cardBackgroundColor="@color/white">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:orientation="vertical"
         android:layout_height="wrap_content">
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -27,7 +27,6 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
-                <!-- Avatar -->
                 <androidx.appcompat.widget.AppCompatImageView
                     android:id="@+id/imgAvatar"
                     android:layout_width="40dp"
@@ -36,7 +35,6 @@
                     android:scaleType="centerCrop"
                     android:background="@drawable/bg_circle"/>
 
-                <!-- Name + time -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -56,12 +54,11 @@
                         android:id="@+id/tvTime"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="2 giờ trước "
+                        android:text="2 giờ trước"
                         android:textSize="12sp"
                         android:textColor="#888"/>
                 </LinearLayout>
 
-                <!-- Status -->
                 <TextView
                     android:id="@+id/tvStatus"
                     android:layout_width="wrap_content"
@@ -78,7 +75,6 @@
                 android:id="@+id/tvTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Mất iPhone 15 Pro màu xanh"
                 android:textStyle="bold"
                 android:textSize="16sp"
                 android:layout_marginTop="8dp"/>
@@ -88,18 +84,19 @@
                 android:id="@+id/tvDescription"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Mất điện thoại tại cafe The Coffee House..."
                 android:textSize="14sp"
-                android:layout_marginTop="4dp"/>
+                android:layout_marginTop="4dp"
+                android:maxLines="3"
+                android:ellipsize="end"/>
 
-            <!-- Image -->
+            <!-- Images -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvPostImages"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"/>
 
-            <!-- Location + time -->
+            <!-- Location -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -110,7 +107,6 @@
                     android:id="@+id/tvLocation"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Quận 1, TP.HCM - "
                     android:textSize="12sp"
                     android:textColor="#666"/>
 
@@ -118,9 +114,9 @@
                     android:id="@+id/tvTimePerfrom"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="14:30 hôm nay"
                     android:textSize="12sp"
-                    android:textColor="#666"/>
+                    android:textColor="#666"
+                    android:visibility="gone"/>
             </LinearLayout>
 
             <!-- Divider -->
@@ -130,15 +126,13 @@
                 android:background="#EEE"
                 android:layout_marginVertical="8dp"/>
 
-            <!-- Actions -->
+            <!-- Actions row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="8dp">
+                android:gravity="center_vertical">
 
-                <!-- Share -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnShare"
                     android:layout_width="0dp"
@@ -153,11 +147,8 @@
                     app:backgroundTint="@color/primary_blue"
                     android:textColor="@android:color/white"/>
 
-                <Space
-                    android:layout_width="6dp"
-                    android:layout_height="wrap_content"/>
+                <Space android:layout_width="6dp" android:layout_height="wrap_content"/>
 
-                <!-- Chat -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnChat"
                     android:layout_width="0dp"
@@ -172,11 +163,25 @@
                     app:backgroundTint="@color/primary_blue"
                     android:textColor="@android:color/white"/>
 
-                <Space
-                    android:layout_width="6dp"
-                    android:layout_height="wrap_content"/>
+                <Space android:layout_width="6dp" android:layout_height="wrap_content"/>
 
-                <!-- Edit -->
+                <!-- NÚT MỚI: Bình luận -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnComment"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:text="Bình luận"
+                    android:textAllCaps="false"
+                    android:textSize="12sp"
+                    android:maxLines="1"
+                    android:paddingHorizontal="6dp"
+                    app:cornerRadius="10dp"
+                    app:backgroundTint="@color/primary_grey"
+                    android:textColor="@color/black"/>
+
+                <Space android:layout_width="6dp" android:layout_height="wrap_content"/>
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnEdit"
                     android:layout_width="0dp"
@@ -189,13 +194,11 @@
                     android:paddingHorizontal="6dp"
                     app:cornerRadius="10dp"
                     app:backgroundTint="@color/primary_blue"
-                    android:textColor="@android:color/white"/>
+                    android:textColor="@android:color/white"
+                    android:visibility="gone"/>
 
-                <Space
-                    android:layout_width="6dp"
-                    android:layout_height="wrap_content"/>
+                <Space android:layout_width="6dp" android:layout_height="wrap_content"/>
 
-                <!-- Delete -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnDelete"
                     android:layout_width="0dp"
@@ -208,16 +211,28 @@
                     android:paddingHorizontal="6dp"
                     app:cornerRadius="10dp"
                     app:backgroundTint="@android:color/holo_red_dark"
-                    android:textColor="@android:color/white"/>
+                    android:textColor="@android:color/white"
+                    android:visibility="gone"/>
 
             </LinearLayout>
+
         </LinearLayout>
+
+        <!-- COMMENT CONTAINER: inflate động vào đây -->
+        <LinearLayout
+            android:id="@+id/commentContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#F8F8F8"/>
+
+        <!-- Divider dưới cùng -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="2dp"
             android:background="@color/primary_grey"
-            android:gravity="bottom"
-            />
+            android:gravity="bottom"/>
+
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>
